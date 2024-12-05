@@ -80,7 +80,8 @@ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
       "args" : ["--config", "/path/to/your/config.txt"],
       "env": { // Alternatively, you can set the environment variables here
         "AXIOM_TOKEN": "xaat-your-token",
-        "AXIOM_URL": "https://api.axiom.co"
+        "AXIOM_URL": "https://api.axiom.co",
+        "AXIOM_ORG_ID": "your-org-id"
       }
     }
   }
