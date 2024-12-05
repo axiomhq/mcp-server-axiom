@@ -52,6 +52,7 @@ axiom-mcp \
 ```bash
 export AXIOM_TOKEN=xaat-your-token
 export AXIOM_URL=https://api.axiom.co
+export AXIOM_ORG_ID=your-org-id
 export AXIOM_QUERY_RATE=1
 export AXIOM_QUERY_BURST=1
 export AXIOM_DATASETS_RATE=1
@@ -75,8 +76,8 @@ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
 {
   "mcpServers": {
     "axiom": {
-      "command": "/path/to/your/axiom-mcp-binary"
-      "args" : ["--config", "/path/to/your/config.txt"]
+      "command": "/path/to/your/axiom-mcp-binary",
+      "args" : ["--config", "/path/to/your/config.txt"],
       "env": { // Alternatively, you can set the environment variables here
         "AXIOM_TOKEN": "xaat-your-token",
         "AXIOM_URL": "https://api.axiom.co"
