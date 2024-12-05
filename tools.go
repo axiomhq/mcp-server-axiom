@@ -16,7 +16,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 	client, err := axiom.NewClient(
 		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
-		axiom.SetOrganizationID(cfg.orgId),
+		axiom.SetOrganizationID(cfg.orgID),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Axiom client: %w", err)
