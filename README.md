@@ -13,6 +13,12 @@ No support for MCP [resources](https://modelcontextprotocol.io/docs/concepts/res
 
 ## Installation
 
+### Releases
+
+Download the latest built binary from the [releases page](https://github.com/axiomhq/axiom-mcp/releases).
+
+### Source
+
 ```bash
 go install github.com/axiomhq/axiom-mcp@latest
 ```
