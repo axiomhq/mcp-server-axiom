@@ -45,7 +45,7 @@ type config struct {
 	// Axiom connection settings
 	token string // API token for authentication
 	url   string // Optional custom API URL
-	orgId string // Organization ID
+	orgID string // Organization ID
 
 	// Rate limiting configuration
 	queryRateLimit    float64 // Maximum queries per second
