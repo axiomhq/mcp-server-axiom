@@ -18,7 +18,7 @@ builds:
       - -X main.Version={{.Version}}
       - -X main.CommitSHA={{.Commit}}
       - -X main.BuildTime={{.Date}}
-    main: ./main.go
+    main: .
 
 archives:
   - format: tar.gz
@@ -35,11 +35,11 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^ci:'
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
       - Merge pull request
       - Merge branch
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
