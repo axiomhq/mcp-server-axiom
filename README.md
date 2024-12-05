@@ -25,9 +25,9 @@ Configure using one of these methods:
 ```txt
 token xaat-your-token
 url https://api.axiom.co
-query-rate 10
+query-rate 1
 query-burst 1
-datasets-rate 5
+datasets-rate 1
 datasets-burst 1
 ```
 
