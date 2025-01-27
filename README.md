@@ -1,5 +1,7 @@
 # mcp-server-axiom
 
+[![smithery badge](https://smithery.ai/badge/axiom-mcp)](https://smithery.ai/server/axiom-mcp)
+
 A [Model Context Protocol](https://modelcontextprotocol.io/) server implementation for [Axiom](https://axiom.co) that enables AI agents to query your data using Axiom Processing Language (APL).
 
 ## Status
@@ -12,6 +14,14 @@ Works with Claude desktop app. Implements two MCP [tools](https://modelcontextpr
 No support for MCP [resources](https://modelcontextprotocol.io/docs/concepts/resources) or [prompts](https://modelcontextprotocol.io/docs/concepts/prompts) yet.
 
 ## Installation
+
+### Installing via Smithery
+
+To install Axiom MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/axiom-mcp):
+
+```bash
+npx -y @smithery/cli install axiom-mcp --client claude
+```
 
 ### Releases
 
