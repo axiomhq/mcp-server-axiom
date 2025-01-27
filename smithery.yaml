@@ -1,0 +1,36 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - axiomToken
+      - axiomUrl
+    properties:
+      axiomToken:
+        type: string
+        description: The token for Axiom API.
+      axiomUrl:
+        type: string
+        description: The Axiom API URL.
+      axiomOrgId:
+        type: string
+        description: The organization ID for Axiom.
+      axiomQueryRate:
+        type: number
+        description: Query rate limit per second.
+      axiomQueryBurst:
+        type: number
+        description: Query burst limit.
+      axiomDatasetsRate:
+        type: number
+        description: Datasets rate limit per second.
+      axiomDatasetsBurst:
+        type: number
+        description: Datasets burst limit.
+  commandFunction:
+    # A function that produces the CLI command to start the MCP on stdio.
+    |-
+    (config) => ({command: './axiom-mcp', env: {AXIOM_TOKEN: config.axiomToken, AXIOM_URL: config.axiomUrl, AXIOM_ORG_ID: config.axiomOrgId, AXIOM_QUERY_RATE: config.axiomQueryRate.toString(), AXIOM_QUERY_BURST: config.axiomQueryBurst.toString(), AXIOM_DATASETS_RATE: config.axiomDatasetsRate.toString(), AXIOM_DATASETS_BURST: config.axiomDatasetsBurst.toString()}})
