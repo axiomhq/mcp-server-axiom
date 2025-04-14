@@ -5,6 +5,7 @@ go 1.23.3
 require (
 	github.com/acrmp/mcp v0.0.0-20241203020558-dd8bd6872080
 	github.com/axiomhq/axiom-go v0.21.1
+	github.com/peterbourgon/ff/v3 v3.4.0
 	golang.org/x/time v0.8.0
 )
 
@@ -22,8 +23,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/peterbourgon/ff v1.7.1 // indirect
-	github.com/peterbourgon/ff/v3 v3.4.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sanity-io/litter v1.5.5 // indirect
 	github.com/sourcegraph/jsonrpc2 v0.2.0 // indirect
@@ -33,8 +32,8 @@ require (
 	go.opentelemetry.io/otel v1.30.0 // indirect
 	go.opentelemetry.io/otel/metric v1.30.0 // indirect
 	go.opentelemetry.io/otel/trace v1.30.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 )
