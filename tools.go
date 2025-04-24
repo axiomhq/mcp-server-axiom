@@ -71,7 +71,7 @@ const queryDescription = `
    It's expensive to project all fields.
 6. ALWAYS restrict the time range of the query to the smallest possible range that
    meets your needs. This will reduce the amount of data scanned and improve query performance.
-7. NEVER guess the schema of the dataset. If you don't where something is, use search first to find in which fields
+7. NEVER guess the schema of the dataset. If you don't know where something is, use search first to find in which fields
    it appears.
 
 # Examples
