@@ -355,16 +355,15 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 		ctx := context.Background()
 
 		baseURL := cfg.url
-		fullURL := baseURL + "/api/internal/monitors"
+		fullURL := baseURL + "/v2/monitors"
 
 		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.internalAuthToken)
-		req.Header.Set("x-axiom-check", "good")
-		req.Header.Set("x-axiom-org-id", cfg.orgID)
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Accept", "application/json")
 
 		clientHTTP := &http.Client{}
 		resp, err := clientHTTP.Do(req)
