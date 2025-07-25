@@ -32,7 +32,6 @@ Configure using one of these methods:
 token xaat-your-token
 url https://api.axiom.co
 org-id your-org-id
-internal-auth-token your-internal-token
 query-rate 1
 query-burst 1
 datasets-rate 1
@@ -45,7 +44,6 @@ axiom-mcp \
   -token xaat-your-token \
   -url https://api.axiom.co \
   -org-id your-org-id \
-  -internal-auth-token your-internal-token \
   -query-rate 1 \
   -query-burst 1 \
   -datasets-rate 1 \
@@ -57,7 +55,6 @@ axiom-mcp \
 export AXIOM_TOKEN=xaat-your-token
 export AXIOM_URL=https://api.axiom.co
 export AXIOM_ORG_ID=your-org-id
-export AXIOM_INTERNAL_AUTH_TOKEN=your-internal-token
 export AXIOM_QUERY_RATE=1
 export AXIOM_QUERY_BURST=1
 export AXIOM_DATASETS_RATE=1

@@ -75,7 +75,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 		{
 			Metadata: mcp.Tool{
 				Name:        "getSavedQueries",
-				Description: ptr("Retrieve saved/starred queries from Axiom"),
+				Description: ptr("Retrieve saved/starred queries from Axiom - shows APL queries that users have bookmarked for reuse"),
 				InputSchema: mcp.ToolInputSchema{
 					Type:       "object",
 					Properties: mcp.ToolInputSchemaProperties{},
@@ -256,28 +256,13 @@ func newGetDatasetSchemaHandler(client *axiom.Client) func(mcp.CallToolRequestPa
 
 		ctx := context.Background()
 
-		//  dataset metadata
-		datasetInfo, err := client.Datasets.Get(ctx, datasetName)
+		query := fmt.Sprintf("['%s'] | getschema", datasetName)
+		result, err := client.Query(ctx, query)
 		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to get dataset info: %w", err)
+			return mcp.CallToolResult{}, fmt.Errorf("failed to get dataset schema: %w", err)
 		}
 
-		// Query for a single event
-		query := fmt.Sprintf("['%s'] | take 1", datasetName)
-		queryResult, err := client.Query(ctx, query)
-		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to query for sample event: %w", err)
-		}
-
-		// Combine both into a single schema object
-		schemaResponse := map[string]interface{}{
-			"name":        datasetInfo.Name,
-			"description": datasetInfo.Description,
-			"mapFields":   datasetInfo.MapFields, // From the Get() call
-			"liveSchema":  queryResult,           // From the Query() call
-		}
-
-		jsonData, err := json.MarshalIndent(schemaResponse, "", "  ")
+		jsonData, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 		}
@@ -293,14 +278,16 @@ func newGetDatasetSchemaHandler(client *axiom.Client) func(mcp.CallToolRequestPa
 	}
 }
 
-// SavedQuery
+// SavedQuery represents a starred query from the v2/apl-starred-queries endpoint
 type SavedQuery struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty"`
-	Query       interface{} `json:"query"`
-	CreatedAt   string      `json:"created_at"`
-	UpdatedAt   string      `json:"updated_at"`
+	Dataset string `json:"dataset"`
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Query   struct {
+		Apl string `json:"apl"`
+	} `json:"query"`
+	Who string `json:"who"`
+	ID  string `json:"id"`
 }
 
 // newGetSavedQueriesHandler creates a handler for retrieving saved queries
@@ -309,17 +296,15 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 		ctx := context.Background()
 
 		baseURL := cfg.url
-		fullURL := baseURL + "/api/internal/starred?limit=21&who=all"
+		fullURL := baseURL + "/v2/apl-starred-queries?limit=100&who=all"
 
 		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.internalAuthToken)
-		req.Header.Set("x-axiom-check", "good")
-		req.Header.Set("x-axiom-org-id", cfg.orgID)
-		req.Header.Set("Accept", "application/json, text/plain, */*")
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Accept", "application/json")
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
