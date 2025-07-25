@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/acrmp/mcp"
 	"github.com/axiomhq/axiom-go/axiom"
@@ -81,7 +82,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 				},
 			},
 			Execute:   newGetSavedQueriesHandler(client, cfg),
-			RateLimit: rate.NewLimiter(rate.Limit(1), 1), // 1 request per second, burst 1
+			RateLimit: rate.NewLimiter(rate.Limit(1), 1),
 		},
 		{
 			Metadata: mcp.Tool{
@@ -93,7 +94,25 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 				},
 			},
 			Execute:   newGetMonitorsHandler(client, cfg),
-			RateLimit: rate.NewLimiter(rate.Limit(1), 1),
+			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
+		},
+		{
+			Metadata: mcp.Tool{
+				Name:        "getMonitorsHistory",
+				Description: ptr("Get recent check history of monitors. Use getMonitors to list all available monitors first."),
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: mcp.ToolInputSchemaProperties{
+						"monitorIds": map[string]any{
+							"type":        "array",
+							"items":       map[string]any{"type": "string"},
+							"description": "Array of monitor IDs to get history for",
+						},
+					},
+				},
+			},
+			Execute:   newGetMonitorsHistoryHandler(client, cfg),
+			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 	}, nil
 }
@@ -374,6 +393,98 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
+			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		var parsed any
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return mcp.CallToolResult{
+				Content: []any{
+					mcp.TextContent{Text: string(body), Type: "text"},
+				},
+			}, nil
+		}
+
+		pretty, _ := json.MarshalIndent(parsed, "", "  ")
+		return mcp.CallToolResult{
+			Content: []any{
+				mcp.TextContent{Text: string(pretty), Type: "text"},
+			},
+		}, nil
+	}
+}
+
+// newGetMonitorsHistoryHandler creates a handler for retrieving monitor history
+func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+		ctx := context.Background()
+
+		// Parse monitor IDs from parameters
+		monitorIdsRaw, ok := params.Arguments["monitorIds"]
+		if !ok {
+			return mcp.CallToolResult{}, fmt.Errorf("monitorIds parameter is required")
+		}
+
+		monitorIdsSlice, ok := monitorIdsRaw.([]interface{})
+		if !ok {
+			return mcp.CallToolResult{}, fmt.Errorf("monitorIds must be an array")
+		}
+
+		// Convert to string slice and filter/trim
+		var monitorIds []string
+		for _, id := range monitorIdsSlice {
+			if idStr, ok := id.(string); ok {
+				trimmed := strings.TrimSpace(idStr)
+				if trimmed != "" {
+					monitorIds = append(monitorIds, trimmed)
+				}
+			}
+		}
+
+		if len(monitorIds) == 0 {
+			return mcp.CallToolResult{}, fmt.Errorf("at least one valid monitor ID is required")
+		}
+
+		baseURL := cfg.url
+		fullURL := fmt.Sprintf("%s/api/internal/monitors/history?monitorIds=%s",
+			baseURL,
+			strings.Join(monitorIds, ","))
+
+		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Accept", "application/json")
+
+		clientHTTP := &http.Client{}
+		resp, err := clientHTTP.Do(req)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+
+			// permission errors
+			if resp.StatusCode == 403 {
+				return mcp.CallToolResult{
+					Content: []any{
+						mcp.TextContent{
+							Text: fmt.Sprintf("⚠️ Permission denied: Your API token does not have access to monitor history.\n\nNote: Monitor history uses an internal API endpoint that may require special permissions.\n\nMonitor IDs requested: %v\n\nError details: %s", monitorIds, string(body)),
+							Type: "text",
+						},
+					},
+				}, nil
+			}
+
 			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 		}
 

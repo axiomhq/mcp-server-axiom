@@ -54,6 +54,8 @@ type config struct {
 	queryRateBurst    int     // Maximum burst capacity for queries
 	datasetsRateLimit float64 // Maximum dataset list operations per second
 	datasetsRateBurst int     // Maximum burst capacity for dataset operations
+	monitorsRateLimit float64 // Maximum monitor operations per second
+	monitorsRateBurst int     // Maximum burst capacity for monitor operations
 }
 
 // setupConfig initializes and parses the configuration
@@ -69,6 +71,8 @@ func setupConfig() (config, error) {
 	fs.IntVar(&cfg.queryRateBurst, "query-burst", 1, "Query burst capacity")
 	fs.Float64Var(&cfg.datasetsRateLimit, "datasets-rate", 1, "Dataset list operations per second")
 	fs.IntVar(&cfg.datasetsRateBurst, "datasets-burst", 1, "Dataset list burst capacity")
+	fs.Float64Var(&cfg.monitorsRateLimit, "monitors-rate", 1, "Monitor operations per second")
+	fs.IntVar(&cfg.monitorsRateBurst, "monitors-burst", 1, "Monitor operations burst capacity")
 
 	var configFile string
 	fs.StringVar(&configFile, "config", "", "config file path")
