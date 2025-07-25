@@ -289,8 +289,8 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
-		baseURL := "https://app.dev.axiomtestlabs.co"
-		fullURL := baseURL + "/api/internal/starred?limit=21&offset=0&who=all"
+		baseURL := cfg.url
+		fullURL := baseURL + "/api/internal/starred?limit=21&who=all"
 
 		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
 		if err != nil {
@@ -300,6 +300,7 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 		req.Header.Set("Authorization", "Bearer "+cfg.internalAuthToken)
 		req.Header.Set("x-axiom-check", "good")
 		req.Header.Set("x-axiom-org-id", cfg.orgID)
+		req.Header.Set("Accept", "application/json, text/plain, */*")
 
 		client := &http.Client{}
 		resp, err := client.Do(req)
@@ -353,7 +354,7 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
-		baseURL := "https://app.dev.axiomtestlabs.co"
+		baseURL := cfg.url
 		fullURL := baseURL + "/api/internal/monitors"
 
 		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
