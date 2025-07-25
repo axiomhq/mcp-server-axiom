@@ -31,6 +31,7 @@ Configure using one of these methods:
 ```txt
 token xaat-your-token
 url https://api.axiom.co
+org-id your-org-id
 query-rate 1
 query-burst 1
 datasets-rate 1
@@ -42,6 +43,7 @@ datasets-burst 1
 axiom-mcp \
   -token xaat-your-token \
   -url https://api.axiom.co \
+  -org-id your-org-id \
   -query-rate 1 \
   -query-burst 1 \
   -datasets-rate 1 \

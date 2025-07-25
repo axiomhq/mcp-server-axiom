@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	"github.com/acrmp/mcp"
 	"github.com/axiomhq/axiom-go/axiom"
@@ -51,6 +54,65 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 			},
 			Execute:   newListDatasetsHandler(client),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.datasetsRateLimit), cfg.datasetsRateBurst),
+		},
+		{
+			Metadata: mcp.Tool{
+				Name:        "getDatasetSchema",
+				Description: ptr("Get the schema of an Axiom dataset by fetching a single event. This is useful for understanding the structure of the data before writing a query."),
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: mcp.ToolInputSchemaProperties{
+						"datasetName": map[string]any{
+							"type":        "string",
+							"description": "The name of the dataset to get the schema for.",
+						},
+					},
+				},
+			},
+			Execute:   newGetDatasetSchemaHandler(client),
+			RateLimit: rate.NewLimiter(rate.Limit(cfg.queryRateLimit), cfg.queryRateBurst),
+		},
+		{
+			Metadata: mcp.Tool{
+				Name:        "getSavedQueries",
+				Description: ptr("Retrieve saved/starred queries from Axiom - shows APL queries that users have bookmarked for reuse"),
+				InputSchema: mcp.ToolInputSchema{
+					Type:       "object",
+					Properties: mcp.ToolInputSchemaProperties{},
+				},
+			},
+			Execute:   newGetSavedQueriesHandler(client, cfg),
+			RateLimit: rate.NewLimiter(rate.Limit(1), 1),
+		},
+		{
+			Metadata: mcp.Tool{
+				Name:        "getMonitors",
+				Description: ptr("Retrieve monitors from Axiom"),
+				InputSchema: mcp.ToolInputSchema{
+					Type:       "object",
+					Properties: mcp.ToolInputSchemaProperties{},
+				},
+			},
+			Execute:   newGetMonitorsHandler(client, cfg),
+			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
+		},
+		{
+			Metadata: mcp.Tool{
+				Name:        "getMonitorsHistory",
+				Description: ptr("Get recent check history of monitors. Use getMonitors to list all available monitors first."),
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: mcp.ToolInputSchemaProperties{
+						"monitorIds": map[string]any{
+							"type":        "array",
+							"items":       map[string]any{"type": "string"},
+							"description": "Array of monitor IDs to get history for",
+						},
+					},
+				},
+			},
+			Execute:   newGetMonitorsHistoryHandler(client, cfg),
+			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 	}, nil
 }
@@ -179,6 +241,256 @@ func newListDatasetsHandler(client *axiom.Client) func(mcp.CallToolRequestParams
 					Text: string(jsonData),
 					Type: "text",
 				},
+			},
+		}, nil
+	}
+}
+
+// newGetDatasetSchemaHandler creates a handler for getting complete dataset schema
+func newGetDatasetSchemaHandler(client *axiom.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+		datasetName, ok := params.Arguments["datasetName"].(string)
+		if !ok || datasetName == "" {
+			return mcp.CallToolResult{}, fmt.Errorf("datasetName parameter is required")
+		}
+
+		ctx := context.Background()
+
+		query := fmt.Sprintf("['%s'] | getschema", datasetName)
+		result, err := client.Query(ctx, query)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to get dataset schema: %w", err)
+		}
+
+		jsonData, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
+		}
+
+		return mcp.CallToolResult{
+			Content: []any{
+				mcp.TextContent{
+					Text: string(jsonData),
+					Type: "text",
+				},
+			},
+		}, nil
+	}
+}
+
+// SavedQuery represents a starred query from the v2/apl-starred-queries endpoint
+type SavedQuery struct {
+	Dataset string `json:"dataset"`
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Query   struct {
+		Apl string `json:"apl"`
+	} `json:"query"`
+	Who string `json:"who"`
+	ID  string `json:"id"`
+}
+
+// newGetSavedQueriesHandler creates a handler for retrieving saved queries
+func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+		ctx := context.Background()
+
+		baseURL := cfg.url
+		fullURL := baseURL + "/v2/apl-starred-queries?limit=100&who=all"
+
+		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Accept", "application/json")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		// Try to decode into our struct
+		var savedQueries []SavedQuery
+		if err := json.Unmarshal(body, &savedQueries); err != nil {
+			// If decoding fails, return the raw response
+			return mcp.CallToolResult{
+				Content: []any{
+					mcp.TextContent{
+						Text: fmt.Sprintf("Failed to decode response: %v\nRaw response:\n%s", err, string(body)),
+						Type: "text",
+					},
+				},
+			}, nil
+		}
+
+		jsonData, err := json.MarshalIndent(savedQueries, "", "  ")
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
+		}
+
+		return mcp.CallToolResult{
+			Content: []any{
+				mcp.TextContent{
+					Text: string(jsonData),
+					Type: "text",
+				},
+			},
+		}, nil
+	}
+}
+
+// newGetMonitorsHandler creates a handler for retrieving monitors
+func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+		ctx := context.Background()
+
+		baseURL := cfg.url
+		fullURL := baseURL + "/v2/monitors"
+
+		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Accept", "application/json")
+
+		clientHTTP := &http.Client{}
+		resp, err := clientHTTP.Do(req)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		var parsed any
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return mcp.CallToolResult{
+				Content: []any{
+					mcp.TextContent{Text: string(body), Type: "text"},
+				},
+			}, nil
+		}
+
+		pretty, _ := json.MarshalIndent(parsed, "", "  ")
+		return mcp.CallToolResult{
+			Content: []any{
+				mcp.TextContent{Text: string(pretty), Type: "text"},
+			},
+		}, nil
+	}
+}
+
+// newGetMonitorsHistoryHandler creates a handler for retrieving monitor history
+func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+		ctx := context.Background()
+
+		// Parse monitor IDs from parameters
+		monitorIdsRaw, ok := params.Arguments["monitorIds"]
+		if !ok {
+			return mcp.CallToolResult{}, fmt.Errorf("monitorIds parameter is required")
+		}
+
+		monitorIdsSlice, ok := monitorIdsRaw.([]interface{})
+		if !ok {
+			return mcp.CallToolResult{}, fmt.Errorf("monitorIds must be an array")
+		}
+
+		// Convert to string slice and filter/trim
+		var monitorIds []string
+		for _, id := range monitorIdsSlice {
+			if idStr, ok := id.(string); ok {
+				trimmed := strings.TrimSpace(idStr)
+				if trimmed != "" {
+					monitorIds = append(monitorIds, trimmed)
+				}
+			}
+		}
+
+		if len(monitorIds) == 0 {
+			return mcp.CallToolResult{}, fmt.Errorf("at least one valid monitor ID is required")
+		}
+
+		baseURL := cfg.url
+		fullURL := fmt.Sprintf("%s/api/internal/monitors/history?monitorIds=%s",
+			baseURL,
+			strings.Join(monitorIds, ","))
+
+		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Accept", "application/json")
+
+		clientHTTP := &http.Client{}
+		resp, err := clientHTTP.Do(req)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+
+			// permission errors
+			if resp.StatusCode == 403 {
+				return mcp.CallToolResult{
+					Content: []any{
+						mcp.TextContent{
+							Text: fmt.Sprintf("⚠️ Permission denied: Your API token does not have access to monitor history.\n\nNote: Monitor history uses an internal API endpoint that may require special permissions.\n\nMonitor IDs requested: %v\n\nError details: %s", monitorIds, string(body)),
+							Type: "text",
+						},
+					},
+				}, nil
+			}
+
+			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		var parsed any
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return mcp.CallToolResult{
+				Content: []any{
+					mcp.TextContent{Text: string(body), Type: "text"},
+				},
+			}, nil
+		}
+
+		pretty, _ := json.MarshalIndent(parsed, "", "  ")
+		return mcp.CallToolResult{
+			Content: []any{
+				mcp.TextContent{Text: string(pretty), Type: "text"},
 			},
 		}, nil
 	}
