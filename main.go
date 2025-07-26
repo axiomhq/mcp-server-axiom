@@ -44,6 +44,7 @@ var (
 type config struct {
 	// Axiom connection settings
 	token string // API token for authentication
+	pat   string // Personal Access Token
 	url   string // Optional custom API URL
 	orgID string // Organization ID
 
@@ -62,6 +63,7 @@ func setupConfig() (config, error) {
 
 	var cfg config
 	fs.StringVar(&cfg.token, "token", "", "Axiom API token")
+	fs.StringVar(&cfg.pat, "pat", "", "Axiom Personal Access Token")
 	fs.StringVar(&cfg.url, "url", "", "Axiom API URL (optional)")
 	fs.StringVar(&cfg.orgID, "org-id", "", "Axiom organization ID")
 	fs.Float64Var(&cfg.queryRateLimit, "query-rate", 1, "Queries per second limit")

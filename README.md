@@ -8,6 +8,13 @@ Works with Claude desktop app. Implements two MCP [tools](https://modelcontextpr
 
 - queryApl: Execute APL queries against Axiom datasets
 - listDatasets: List available Axiom datasets
+- getDatasetSchema: Get dataset schema
+- getSavedQueries: Retrieve saved/starred APL queries
+- getMonitors: List monitoring configurations
+- getMonitorsHistory: Get monitor execution history
+- getQueryHistory: Get your recent APL query execution history (shows your queries by default)
+
+**Note:** getQueryHistory tools require a Personal Access Token (PAT) in addition to the regular API token.
 
 No support for MCP [resources](https://modelcontextprotocol.io/docs/concepts/resources) or [prompts](https://modelcontextprotocol.io/docs/concepts/prompts) yet.
 
@@ -30,6 +37,7 @@ Configure using one of these methods:
 ### Config File Example (config.txt):
 ```txt
 token xaat-your-token
+pat xapt-your-personal-access-token
 url https://api.axiom.co
 org-id your-org-id
 query-rate 1
@@ -42,6 +50,7 @@ datasets-burst 1
 ```bash
 axiom-mcp \
   -token xaat-your-token \
+  -pat xapt-your-personal-access-token \
   -url https://api.axiom.co \
   -org-id your-org-id \
   -query-rate 1 \
@@ -53,6 +62,7 @@ axiom-mcp \
 ### Environment Variables:
 ```bash
 export AXIOM_TOKEN=xaat-your-token
+export AXIOM_PAT=xapt-your-personal-access-token
 export AXIOM_URL=https://api.axiom.co
 export AXIOM_ORG_ID=your-org-id
 export AXIOM_QUERY_RATE=1
@@ -82,6 +92,7 @@ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
       "args" : ["--config", "/path/to/your/config.txt"],
       "env": { // Alternatively, you can set the environment variables here
         "AXIOM_TOKEN": "xaat-your-token",
+        "AXIOM_PAT": "xapt-your-personal-access-token",
         "AXIOM_URL": "https://api.axiom.co",
         "AXIOM_ORG_ID": "your-org-id"
       }
