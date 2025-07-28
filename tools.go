@@ -14,12 +14,35 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// createTools creates the MCP tool definitions with appropriate rate limits
+const MCP_USER_AGENT = "axiom-mcp-server (MCP)"
+
+func createAxiomHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &mcpTransport{
+			base: http.DefaultTransport,
+		},
+	}
+}
+
+type mcpTransport struct {
+	base http.RoundTripper
+}
+
+func (t *mcpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original
+	reqCopy := req.Clone(req.Context())
+	reqCopy.Header.Set("User-Agent", MCP_USER_AGENT)
+	return t.base.RoundTrip(reqCopy)
+}
+
 func createTools(cfg config) ([]mcp.ToolDefinition, error) {
+	httpClient := createAxiomHTTPClient()
+
 	client, err := axiom.NewClient(
 		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
 		axiom.SetOrganizationID(cfg.orgID),
+		axiom.SetClient(httpClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Axiom client: %w", err)
@@ -81,7 +104,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					Properties: mcp.ToolInputSchemaProperties{},
 				},
 			},
-			Execute:   newGetSavedQueriesHandler(client, cfg),
+			Execute:   newGetSavedQueriesHandler(cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(1), 1),
 		},
 		{
@@ -93,7 +116,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					Properties: mcp.ToolInputSchemaProperties{},
 				},
 			},
-			Execute:   newGetMonitorsHandler(client, cfg),
+			Execute:   newGetMonitorsHandler(cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 		{
@@ -111,7 +134,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					},
 				},
 			},
-			Execute:   newGetMonitorsHistoryHandler(client, cfg),
+			Execute:   newGetMonitorsHistoryHandler(cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 		{
@@ -137,7 +160,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					},
 				},
 			},
-			Execute:   newGetQueryHistoryHandler(client, cfg),
+			Execute:   newGetQueryHistoryHandler(client, cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.queryRateLimit), cfg.queryRateBurst),
 		},
 	}, nil
@@ -326,7 +349,7 @@ type QueryHistoryEntry struct {
 }
 
 // newGetSavedQueriesHandler creates a handler for retrieving saved queries
-func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -341,8 +364,7 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
@@ -389,7 +411,7 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 }
 
 // newGetMonitorsHandler creates a handler for retrieving monitors
-func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetMonitorsHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -404,8 +426,7 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
 
-		clientHTTP := &http.Client{}
-		resp, err := clientHTTP.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
@@ -440,7 +461,7 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 }
 
 // newGetMonitorsHistoryHandler creates a handler for retrieving monitor history
-func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -483,8 +504,7 @@ func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.Cal
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
 
-		clientHTTP := &http.Client{}
-		resp, err := clientHTTP.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
@@ -532,7 +552,7 @@ func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.Cal
 }
 
 // getCurrentUserId gets the current user ID from /v2/user endpoint using PAT
-func getCurrentUserId(cfg config) (string, error) {
+func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
 	ctx := context.Background()
 
 	if cfg.pat == "" {
@@ -550,8 +570,7 @@ func getCurrentUserId(cfg config) (string, error) {
 	req.Header.Set("Authorization", "Bearer "+cfg.pat)
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute request: %w", err)
 	}
@@ -580,7 +599,7 @@ func getCurrentUserId(cfg config) (string, error) {
 }
 
 // newGetQueryHistoryHandler creates a handler for retrieving query execution history from axiom-history dataset
-func newGetQueryHistoryHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetQueryHistoryHandler(client *axiom.Client, cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -592,7 +611,7 @@ func newGetQueryHistoryHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 			}
 		}
 
-		currentUserId, err := getCurrentUserId(cfg)
+		currentUserId, err := getCurrentUserId(cfg, httpClient)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to get current user: %w", err)
 		}
