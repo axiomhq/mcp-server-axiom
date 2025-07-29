@@ -572,7 +572,6 @@ func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
 
 	req.Header.Set("Authorization", "Bearer "+cfg.token)
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -589,17 +588,18 @@ func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
-
-	var userResponse map[string]interface{}
+	var userResponse struct {
+		ID string `json:"id"`
+	}
 	if err := json.Unmarshal(body, &userResponse); err != nil {
 		return "", fmt.Errorf("failed to parse user response: %w", err)
 	}
 
-	if userID, ok := userResponse["id"].(string); ok && userID != "" {
-		return userID, nil
+	if userResponse.ID == "" {
+		return "", fmt.Errorf("user ID not found in response")
 	}
 
-	return "", fmt.Errorf("user ID not found in response")
+	return userResponse.ID, nil
 }
 
 // newGetQueryHistoryHandler creates a handler for retrieving query execution history from axiom-history dataset
