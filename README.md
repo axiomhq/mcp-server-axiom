@@ -14,7 +14,7 @@ Works with Claude desktop app. Implements seven MCP [tools](https://modelcontext
 - getMonitorsHistory: Get monitor execution history
 - getQueryHistory: Get your recent APL query execution history (shows your queries by default)
 
-**Note:** All tools require a Personal Access Token (PAT) for authentication.
+**Note:** All tools require a Personal Access Token (PAT) for authentication. Use your PAT as the `token` parameter.
 
 No support for MCP [resources](https://modelcontextprotocol.io/docs/concepts/resources) or [prompts](https://modelcontextprotocol.io/docs/concepts/prompts) yet.
 
@@ -36,7 +36,7 @@ Configure using one of these methods:
 
 ### Config File Example (config.txt):
 ```txt
-pat xapt-your-personal-access-token
+token xapt-your-personal-access-token
 url https://api.axiom.co
 org-id your-org-id
 query-rate 1
@@ -48,7 +48,7 @@ datasets-burst 1
 ### Command Line Flags:
 ```bash
 axiom-mcp \
-  -pat xapt-your-personal-access-token \
+  -token xapt-your-personal-access-token \
   -url https://api.axiom.co \
   -org-id your-org-id \
   -query-rate 1 \
@@ -59,7 +59,7 @@ axiom-mcp \
 
 ### Environment Variables:
 ```bash
-export AXIOM_PAT=xapt-your-personal-access-token
+export AXIOM_TOKEN=xapt-your-personal-access-token
 export AXIOM_URL=https://api.axiom.co
 export AXIOM_ORG_ID=your-org-id
 export AXIOM_QUERY_RATE=1
@@ -72,7 +72,7 @@ export AXIOM_DATASETS_BURST=1
 
 1. Create a config file:
 ```bash
-echo "pat xapt-your-personal-access-token" > config.txt
+echo "token xapt-your-personal-access-token" > config.txt
 ```
 
 2. Configure the Claude app to use the MCP server:
@@ -88,7 +88,7 @@ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
       "command": "/path/to/your/axiom-mcp-binary",
       "args" : ["--config", "/path/to/your/config.txt"],
       "env": { // Alternatively, you can set the environment variables here
-        "AXIOM_PAT": "xapt-your-personal-access-token",
+        "AXIOM_TOKEN": "xapt-your-personal-access-token",
         "AXIOM_URL": "https://api.axiom.co",
         "AXIOM_ORG_ID": "your-org-id"
       }

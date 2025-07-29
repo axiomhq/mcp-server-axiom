@@ -39,7 +39,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 	httpClient := createAxiomHTTPClient()
 
 	client, err := axiom.NewClient(
-		axiom.SetToken(cfg.pat),
+		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
 		axiom.SetOrganizationID(cfg.orgID),
 		axiom.SetClient(httpClient),
@@ -361,7 +361,7 @@ func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.Cal
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.pat)
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
@@ -424,7 +424,7 @@ func newGetMonitorsHandler(cfg config, httpClient *http.Client) func(mcp.CallToo
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.pat)
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
@@ -503,7 +503,7 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.pat)
+		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
@@ -558,7 +558,7 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
 	ctx := context.Background()
 
-	if cfg.pat == "" {
+	if cfg.token == "" {
 		return "", fmt.Errorf("personal Access Token (PAT) is required")
 	}
 
@@ -570,7 +570,7 @@ func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+cfg.pat)
+	req.Header.Set("Authorization", "Bearer "+cfg.token)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
