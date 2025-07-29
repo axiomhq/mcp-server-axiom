@@ -14,12 +14,35 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// createTools creates the MCP tool definitions with appropriate rate limits
+var MCP_USER_AGENT = fmt.Sprintf("mcp-server-axiom/%s", Version)
+
+func createAxiomHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &mcpTransport{
+			base: http.DefaultTransport,
+		},
+	}
+}
+
+type mcpTransport struct {
+	base http.RoundTripper
+}
+
+func (t *mcpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original
+	reqCopy := req.Clone(req.Context())
+	reqCopy.Header.Set("User-Agent", MCP_USER_AGENT)
+	return t.base.RoundTrip(reqCopy)
+}
+
 func createTools(cfg config) ([]mcp.ToolDefinition, error) {
+	httpClient := createAxiomHTTPClient()
+
 	client, err := axiom.NewClient(
 		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
 		axiom.SetOrganizationID(cfg.orgID),
+		axiom.SetClient(httpClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Axiom client: %w", err)
@@ -81,7 +104,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					Properties: mcp.ToolInputSchemaProperties{},
 				},
 			},
-			Execute:   newGetSavedQueriesHandler(client, cfg),
+			Execute:   newGetSavedQueriesHandler(cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(1), 1),
 		},
 		{
@@ -93,7 +116,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					Properties: mcp.ToolInputSchemaProperties{},
 				},
 			},
-			Execute:   newGetMonitorsHandler(client, cfg),
+			Execute:   newGetMonitorsHandler(cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 		{
@@ -111,8 +134,34 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					},
 				},
 			},
-			Execute:   newGetMonitorsHistoryHandler(client, cfg),
+			Execute:   newGetMonitorsHistoryHandler(cfg, httpClient),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
+		},
+		{
+			Metadata: mcp.Tool{
+				Name:        "getQueryHistory",
+				Description: ptr("Get your recent APL query execution history"),
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: mcp.ToolInputSchemaProperties{
+						"limit": map[string]any{
+							"type":        "number",
+							"description": "Maximum number of query history entries to return (default: 50, max: 500)",
+							"default":     50,
+						},
+						"user": map[string]any{
+							"type":        "string",
+							"description": "Filter by specific user ID (optional - defaults to current user)",
+						},
+						"dataset": map[string]any{
+							"type":        "string",
+							"description": "Filter by dataset name (optional)",
+						},
+					},
+				},
+			},
+			Execute:   newGetQueryHistoryHandler(client, cfg, httpClient),
+			RateLimit: rate.NewLimiter(rate.Limit(cfg.queryRateLimit), cfg.queryRateBurst),
 		},
 	}, nil
 }
@@ -290,8 +339,17 @@ type SavedQuery struct {
 	ID  string `json:"id"`
 }
 
+// QueryHistoryEntry represents a query execution record from the axiom-history dataset
+type QueryHistoryEntry struct {
+	Timestamp string `json:"timestamp"`
+	Dataset   string `json:"dataset"`
+	Query     string `json:"query"`
+	UserID    string `json:"userId"`
+	Created   string `json:"created"`
+}
+
 // newGetSavedQueriesHandler creates a handler for retrieving saved queries
-func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -305,9 +363,9 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
@@ -354,7 +412,7 @@ func newGetSavedQueriesHandler(client *axiom.Client, cfg config) func(mcp.CallTo
 }
 
 // newGetMonitorsHandler creates a handler for retrieving monitors
-func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetMonitorsHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -368,9 +426,9 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
-		clientHTTP := &http.Client{}
-		resp, err := clientHTTP.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
@@ -405,7 +463,7 @@ func newGetMonitorsHandler(client *axiom.Client, cfg config) func(mcp.CallToolRe
 }
 
 // newGetMonitorsHistoryHandler creates a handler for retrieving monitor history
-func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
@@ -435,9 +493,9 @@ func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.Cal
 			return mcp.CallToolResult{}, fmt.Errorf("at least one valid monitor ID is required")
 		}
 
-		baseURL := cfg.url
-		fullURL := fmt.Sprintf("%s/api/internal/monitors/history?monitorIds=%s",
-			baseURL,
+		// Convert API URL to App URL for internal endpoint
+		baseURL := strings.Replace(cfg.url, "://api.", "://app.", 1)
+		fullURL := fmt.Sprintf("%s/api/internal/monitors/history?monitorIds=%s", baseURL,
 			strings.Join(monitorIds, ","))
 
 		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
@@ -447,9 +505,9 @@ func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.Cal
 
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
-		clientHTTP := &http.Client{}
-		resp, err := clientHTTP.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
@@ -491,6 +549,114 @@ func newGetMonitorsHistoryHandler(client *axiom.Client, cfg config) func(mcp.Cal
 		return mcp.CallToolResult{
 			Content: []any{
 				mcp.TextContent{Text: string(pretty), Type: "text"},
+			},
+		}, nil
+	}
+}
+
+// getCurrentUserId gets the current user ID from /v2/user endpoint using PAT
+func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
+	ctx := context.Background()
+
+	if cfg.token == "" {
+		return "", fmt.Errorf("personal Access Token (PAT) is required")
+	}
+
+	baseURL := cfg.url
+	fullURL := baseURL + "/v2/user"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+cfg.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	var userResponse struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(body, &userResponse); err != nil {
+		return "", fmt.Errorf("failed to parse user response: %w", err)
+	}
+
+	if userResponse.ID == "" {
+		return "", fmt.Errorf("user ID not found in response")
+	}
+
+	return userResponse.ID, nil
+}
+
+// newGetQueryHistoryHandler creates a handler for retrieving query execution history from axiom-history dataset
+func newGetQueryHistoryHandler(client *axiom.Client, cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+		ctx := context.Background()
+
+		limit := 50
+		if limitParam, ok := params.Arguments["limit"].(float64); ok && limitParam > 0 {
+			limit = int(limitParam)
+			if limit > 500 {
+				limit = 500
+			}
+		}
+
+		currentUserId, err := getCurrentUserId(cfg, httpClient)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to get current user: %w", err)
+		}
+
+		var whereFilters []string
+		whereFilters = append(whereFilters, "kind == \"apl\"")
+
+		// Use current user by default, but allow override -  if the user provides another ID
+		userToFilter := currentUserId
+		if userParam, ok := params.Arguments["user"].(string); ok && userParam != "" {
+			userToFilter = userParam
+		}
+		whereFilters = append(whereFilters, fmt.Sprintf("who == \"%s\"", userToFilter))
+
+		// Optional dataset filter
+		if datasetParam, ok := params.Arguments["dataset"].(string); ok && datasetParam != "" {
+			whereFilters = append(whereFilters, fmt.Sprintf("dataset == \"%s\"", datasetParam))
+		}
+
+		aplQuery := fmt.Sprintf(
+			"[\"axiom-history\"] | where %s | sort by _time desc | take %d | project _time, dataset, [\"query.apl\"], who, created",
+			strings.Join(whereFilters, " and "),
+			limit,
+		)
+
+		result, err := client.Query(ctx, aplQuery)
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to execute query history query: %w", err)
+		}
+
+		jsonData, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return mcp.CallToolResult{}, fmt.Errorf("failed to marshal query history response: %w", err)
+		}
+
+		return mcp.CallToolResult{
+			Content: []any{
+				mcp.TextContent{
+					Text: string(jsonData),
+					Type: "text",
+				},
 			},
 		}, nil
 	}
