@@ -14,7 +14,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const MCP_USER_AGENT = "axiom-mcp-server (MCP)"
+var MCP_USER_AGENT = fmt.Sprintf("mcp-server-axiom/%s", Version)
 
 func createAxiomHTTPClient() *http.Client {
 	return &http.Client{
@@ -39,7 +39,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 	httpClient := createAxiomHTTPClient()
 
 	client, err := axiom.NewClient(
-		axiom.SetToken(cfg.token),
+		axiom.SetToken(cfg.pat),
 		axiom.SetURL(cfg.url),
 		axiom.SetOrganizationID(cfg.orgID),
 		axiom.SetClient(httpClient),
@@ -361,8 +361,9 @@ func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.Cal
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Authorization", "Bearer "+cfg.pat)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
@@ -423,8 +424,9 @@ func newGetMonitorsHandler(cfg config, httpClient *http.Client) func(mcp.CallToo
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Authorization", "Bearer "+cfg.pat)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
@@ -491,9 +493,9 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 			return mcp.CallToolResult{}, fmt.Errorf("at least one valid monitor ID is required")
 		}
 
-		baseURL := cfg.url
-		fullURL := fmt.Sprintf("%s/api/internal/monitors/history?monitorIds=%s",
-			baseURL,
+		// Convert API URL to App URL for internal endpoint
+		baseURL := strings.Replace(cfg.url, "://api.", "://app.", 1)
+		fullURL := fmt.Sprintf("%s/api/internal/monitors/history?monitorIds=%s", baseURL,
 			strings.Join(monitorIds, ","))
 
 		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
@@ -501,8 +503,9 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.token)
+		req.Header.Set("Authorization", "Bearer "+cfg.pat)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
@@ -569,6 +572,7 @@ func getCurrentUserId(cfg config, httpClient *http.Client) (string, error) {
 
 	req.Header.Set("Authorization", "Bearer "+cfg.pat)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

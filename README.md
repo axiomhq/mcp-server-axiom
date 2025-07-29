@@ -4,7 +4,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server implementati
 
 ## Status
 
-Works with Claude desktop app. Implements two MCP [tools](https://modelcontextprotocol.io/docs/concepts/tools):
+Works with Claude desktop app. Implements seven MCP [tools](https://modelcontextprotocol.io/docs/concepts/tools):
 
 - queryApl: Execute APL queries against Axiom datasets
 - listDatasets: List available Axiom datasets
@@ -14,7 +14,7 @@ Works with Claude desktop app. Implements two MCP [tools](https://modelcontextpr
 - getMonitorsHistory: Get monitor execution history
 - getQueryHistory: Get your recent APL query execution history (shows your queries by default)
 
-**Note:** getQueryHistory tools require a Personal Access Token (PAT) in addition to the regular API token.
+**Note:** All tools require a Personal Access Token (PAT) for authentication.
 
 No support for MCP [resources](https://modelcontextprotocol.io/docs/concepts/resources) or [prompts](https://modelcontextprotocol.io/docs/concepts/prompts) yet.
 
@@ -36,7 +36,6 @@ Configure using one of these methods:
 
 ### Config File Example (config.txt):
 ```txt
-token xaat-your-token
 pat xapt-your-personal-access-token
 url https://api.axiom.co
 org-id your-org-id
@@ -49,7 +48,6 @@ datasets-burst 1
 ### Command Line Flags:
 ```bash
 axiom-mcp \
-  -token xaat-your-token \
   -pat xapt-your-personal-access-token \
   -url https://api.axiom.co \
   -org-id your-org-id \
@@ -61,7 +59,6 @@ axiom-mcp \
 
 ### Environment Variables:
 ```bash
-export AXIOM_TOKEN=xaat-your-token
 export AXIOM_PAT=xapt-your-personal-access-token
 export AXIOM_URL=https://api.axiom.co
 export AXIOM_ORG_ID=your-org-id
@@ -75,7 +72,7 @@ export AXIOM_DATASETS_BURST=1
 
 1. Create a config file:
 ```bash
-echo "token xaat-your-token" > config.txt
+echo "pat xapt-your-personal-access-token" > config.txt
 ```
 
 2. Configure the Claude app to use the MCP server:
@@ -91,7 +88,6 @@ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
       "command": "/path/to/your/axiom-mcp-binary",
       "args" : ["--config", "/path/to/your/config.txt"],
       "env": { // Alternatively, you can set the environment variables here
-        "AXIOM_TOKEN": "xaat-your-token",
         "AXIOM_PAT": "xapt-your-personal-access-token",
         "AXIOM_URL": "https://api.axiom.co",
         "AXIOM_ORG_ID": "your-org-id"
