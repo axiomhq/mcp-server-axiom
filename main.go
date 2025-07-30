@@ -43,7 +43,7 @@ var (
 // config holds the server configuration parameters
 type config struct {
 	// Axiom connection settings
-	token string // Personal Access Token (PAT)
+	token string // API token
 	url   string // Optional custom API URL
 	orgID string // Organization ID
 
@@ -61,7 +61,7 @@ func setupConfig() (config, error) {
 	fs := flag.NewFlagSet("axiom-mcp", flag.ExitOnError)
 
 	var cfg config
-	fs.StringVar(&cfg.token, "token", "", "Axiom Personal Access Token (PAT)")
+	fs.StringVar(&cfg.token, "token", "", "Axiom API token")
 	fs.StringVar(&cfg.url, "url", "", "Axiom API URL (optional)")
 	fs.StringVar(&cfg.orgID, "org-id", "", "Axiom organization ID")
 	fs.Float64Var(&cfg.queryRateLimit, "query-rate", 1, "Queries per second limit")
@@ -84,7 +84,7 @@ func setupConfig() (config, error) {
 	}
 
 	if cfg.token == "" {
-		return cfg, errors.New("Axiom Personal Access Token (PAT) must be provided via -token flag, AXIOM_TOKEN env var, or config file")
+		return cfg, errors.New("Axiom API token must be provided via -token flag, AXIOM_TOKEN env var, or config file")
 	}
 
 	return cfg, nil
