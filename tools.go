@@ -482,19 +482,6 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-
-			// permission errors
-			if resp.StatusCode == 403 {
-				return mcp.CallToolResult{
-					Content: []any{
-						mcp.TextContent{
-							Text: fmt.Sprintf("⚠️ Permission denied: Your API token does not have access to monitor history.\n\nNote: Monitor history uses an internal API endpoint that may require special permissions.\n\nMonitor IDs requested: %v\n\nError details: %s", monitorIds, string(body)),
-							Type: "text",
-						},
-					},
-				}, nil
-			}
-
 			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 		}
 
