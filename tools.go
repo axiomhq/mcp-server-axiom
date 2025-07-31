@@ -16,37 +16,19 @@ import (
 
 var MCP_USER_AGENT = fmt.Sprintf("mcp-server-axiom/%s", Version)
 
-func createAxiomHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &mcpTransport{
-			base: http.DefaultTransport,
-		},
-	}
-}
-
-type mcpTransport struct {
-	base http.RoundTripper
-}
-
-func (t *mcpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request to avoid modifying the original
-	reqCopy := req.Clone(req.Context())
-	reqCopy.Header.Set("User-Agent", MCP_USER_AGENT)
-	return t.base.RoundTrip(reqCopy)
-}
-
 func createTools(cfg config) ([]mcp.ToolDefinition, error) {
-	httpClient := createAxiomHTTPClient()
-
 	client, err := axiom.NewClient(
 		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
 		axiom.SetOrganizationID(cfg.orgID),
-		axiom.SetClient(httpClient),
+		axiom.SetUserAgent(MCP_USER_AGENT),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Axiom client: %w", err)
 	}
+
+	// Create basic HTTP client for handlers that need direct API access
+	httpClient := &http.Client{}
 
 	return []mcp.ToolDefinition{
 		{
@@ -313,8 +295,6 @@ type SavedQuery struct {
 	ID  string `json:"id"`
 }
 
-
-
 // newGetSavedQueriesHandler creates a handler for retrieving saved queries
 func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
@@ -520,5 +500,3 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 		}, nil
 	}
 }
-
-
