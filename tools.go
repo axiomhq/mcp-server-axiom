@@ -355,7 +355,7 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 			return mcp.CallToolResult{}, fmt.Errorf("monitorIds parameter is required")
 		}
 
-		monitorIdsSlice, ok := monitorIdsRaw.([]interface{})
+		monitorIdsSlice, ok := monitorIdsRaw.([]any)
 		if !ok {
 			return mcp.CallToolResult{}, fmt.Errorf("monitorIds must be an array")
 		}
