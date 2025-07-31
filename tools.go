@@ -16,33 +16,12 @@ import (
 
 var MCP_USER_AGENT = fmt.Sprintf("mcp-server-axiom/%s", Version)
 
-func createAxiomHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &mcpTransport{
-			base: http.DefaultTransport,
-		},
-	}
-}
-
-type mcpTransport struct {
-	base http.RoundTripper
-}
-
-func (t *mcpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request to avoid modifying the original
-	reqCopy := req.Clone(req.Context())
-	reqCopy.Header.Set("User-Agent", MCP_USER_AGENT)
-	return t.base.RoundTrip(reqCopy)
-}
-
 func createTools(cfg config) ([]mcp.ToolDefinition, error) {
-	httpClient := createAxiomHTTPClient()
-
 	client, err := axiom.NewClient(
 		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
 		axiom.SetOrganizationID(cfg.orgID),
-		axiom.SetClient(httpClient),
+		axiom.SetUserAgent(MCP_USER_AGENT),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Axiom client: %w", err)
@@ -104,7 +83,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					Properties: mcp.ToolInputSchemaProperties{},
 				},
 			},
-			Execute:   newGetSavedQueriesHandler(cfg, httpClient),
+			Execute:   newGetSavedQueriesHandler(client),
 			RateLimit: rate.NewLimiter(rate.Limit(1), 1),
 		},
 		{
@@ -116,7 +95,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					Properties: mcp.ToolInputSchemaProperties{},
 				},
 			},
-			Execute:   newGetMonitorsHandler(cfg, httpClient),
+			Execute:   newGetMonitorsHandler(client),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 		{
@@ -134,7 +113,7 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 					},
 				},
 			},
-			Execute:   newGetMonitorsHistoryHandler(cfg, httpClient),
+			Execute:   newGetMonitorsHistoryHandler(cfg, axiom.DefaultHTTPClient()),
 			RateLimit: rate.NewLimiter(rate.Limit(cfg.monitorsRateLimit), cfg.monitorsRateBurst),
 		},
 	}, nil
@@ -313,56 +292,17 @@ type SavedQuery struct {
 	ID  string `json:"id"`
 }
 
-
-
 // newGetSavedQueriesHandler creates a handler for retrieving saved queries
-func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetSavedQueriesHandler(client *axiom.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
-		baseURL := cfg.url
-		fullURL := baseURL + "/v2/apl-starred-queries?limit=100&who=all"
-
-		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
-		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Authorization", "Bearer "+cfg.token)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
-
-		resp, err := httpClient.Do(req)
-		if err != nil {
+		var res []SavedQuery
+		if err := client.Call(ctx, http.MethodGet, "/v2/apl-starred-queries?limit=100&who=all", nil, &res); err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
 		}
-		defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to read response body: %w", err)
-		}
-
-		// Try to decode into our struct
-		var savedQueries []SavedQuery
-		if err := json.Unmarshal(body, &savedQueries); err != nil {
-			// If decoding fails, return the raw response
-			return mcp.CallToolResult{
-				Content: []any{
-					mcp.TextContent{
-						Text: fmt.Sprintf("Failed to decode response: %v\nRaw response:\n%s", err, string(body)),
-						Type: "text",
-					},
-				},
-			}, nil
-		}
-
-		jsonData, err := json.MarshalIndent(savedQueries, "", "  ")
+		jsonData, err := json.MarshalIndent(res, "", "  ")
 		if err != nil {
 			return mcp.CallToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 		}
@@ -379,51 +319,26 @@ func newGetSavedQueriesHandler(cfg config, httpClient *http.Client) func(mcp.Cal
 }
 
 // newGetMonitorsHandler creates a handler for retrieving monitors
-func newGetMonitorsHandler(cfg config, httpClient *http.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
+func newGetMonitorsHandler(client *axiom.Client) func(mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 	return func(params mcp.CallToolRequestParams) (mcp.CallToolResult, error) {
 		ctx := context.Background()
 
-		baseURL := cfg.url
-		fullURL := baseURL + "/v2/monitors"
-
-		req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+		res, err := client.Monitors.List(ctx)
 		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to create request: %w", err)
+			return mcp.CallToolResult{}, fmt.Errorf("failed to list monitors: %w", err)
 		}
 
-		req.Header.Set("Authorization", "Bearer "+cfg.token)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
-
-		resp, err := httpClient.Do(req)
+		jsonData, err := json.MarshalIndent(res, "", "  ")
 		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to execute request: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			return mcp.CallToolResult{}, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+			return mcp.CallToolResult{}, fmt.Errorf("failed to marshal response: %w", err)
 		}
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return mcp.CallToolResult{}, fmt.Errorf("failed to read response body: %w", err)
-		}
-
-		var parsed any
-		if err := json.Unmarshal(body, &parsed); err != nil {
-			return mcp.CallToolResult{
-				Content: []any{
-					mcp.TextContent{Text: string(body), Type: "text"},
-				},
-			}, nil
-		}
-
-		pretty, _ := json.MarshalIndent(parsed, "", "  ")
 		return mcp.CallToolResult{
 			Content: []any{
-				mcp.TextContent{Text: string(pretty), Type: "text"},
+				mcp.TextContent{
+					Text: string(jsonData),
+					Type: "text",
+				},
 			},
 		}, nil
 	}
@@ -440,7 +355,7 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 			return mcp.CallToolResult{}, fmt.Errorf("monitorIds parameter is required")
 		}
 
-		monitorIdsSlice, ok := monitorIdsRaw.([]interface{})
+		monitorIdsSlice, ok := monitorIdsRaw.([]any)
 		if !ok {
 			return mcp.CallToolResult{}, fmt.Errorf("monitorIds must be an array")
 		}
@@ -520,5 +435,3 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 		}, nil
 	}
 }
-
-
