@@ -37,7 +37,6 @@ Configure using one of these methods:
 ```txt
 token xaat-your-api-token
 url https://api.axiom.co
-org-id your-org-id
 query-rate 1
 query-burst 1
 datasets-rate 1
@@ -49,7 +48,6 @@ datasets-burst 1
 axiom-mcp \
   -token xaat-your-api-token \
   -url https://api.axiom.co \
-  -org-id your-org-id \
   -query-rate 1 \
   -query-burst 1 \
   -datasets-rate 1 \
@@ -60,7 +58,6 @@ axiom-mcp \
 ```bash
 export AXIOM_TOKEN=xaat-your-api-token
 export AXIOM_URL=https://api.axiom.co
-export AXIOM_ORG_ID=your-org-id
 export AXIOM_QUERY_RATE=1
 export AXIOM_QUERY_BURST=1
 export AXIOM_DATASETS_RATE=1
@@ -88,8 +85,7 @@ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
       "args" : ["--config", "/path/to/your/config.txt"],
       "env": { // Alternatively, you can set the environment variables here
         "AXIOM_TOKEN": "xaat-your-api-token",
-        "AXIOM_URL": "https://api.axiom.co",
-        "AXIOM_ORG_ID": "your-org-id"
+        "AXIOM_URL": "https://api.axiom.co"
       }
     }
   }

@@ -20,7 +20,6 @@ func createTools(cfg config) ([]mcp.ToolDefinition, error) {
 	client, err := axiom.NewClient(
 		axiom.SetToken(cfg.token),
 		axiom.SetURL(cfg.url),
-		axiom.SetOrganizationID(cfg.orgID),
 		axiom.SetUserAgent(MCP_USER_AGENT),
 	)
 	if err != nil {
@@ -387,7 +386,6 @@ func newGetMonitorsHistoryHandler(cfg config, httpClient *http.Client) func(mcp.
 
 		req.Header.Set("Authorization", "Bearer "+cfg.token)
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("X-AXIOM-ORG-ID", cfg.orgID)
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
