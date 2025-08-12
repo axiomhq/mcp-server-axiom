@@ -41,6 +41,8 @@ query-rate 1
 query-burst 1
 datasets-rate 1
 datasets-burst 1
+monitors-rate 1
+monitors-burst 1
 ```
 
 ### Command Line Flags:
@@ -51,7 +53,9 @@ axiom-mcp \
   -query-rate 1 \
   -query-burst 1 \
   -datasets-rate 1 \
-  -datasets-burst 1
+  -datasets-burst 1 \
+  -monitors-rate 1 \
+  -monitors-burst 1
 ```
 
 ### Environment Variables:
@@ -62,6 +66,8 @@ export AXIOM_QUERY_RATE=1
 export AXIOM_QUERY_BURST=1
 export AXIOM_DATASETS_RATE=1
 export AXIOM_DATASETS_BURST=1
+export AXIOM_MONITORS_RATE=1
+export AXIOM_MONITORS_BURST=1
 ```
 
 ## Usage
