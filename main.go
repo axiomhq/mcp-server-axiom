@@ -45,7 +45,6 @@ type config struct {
 	// Axiom connection settings
 	token string // API token
 	url   string // Optional custom API URL
-	orgID string // Organization ID
 
 	// Rate limiting configuration
 	queryRateLimit    float64 // Maximum queries per second
@@ -63,7 +62,6 @@ func setupConfig() (config, error) {
 	var cfg config
 	fs.StringVar(&cfg.token, "token", "", "Axiom API token")
 	fs.StringVar(&cfg.url, "url", "", "Axiom API URL (optional)")
-	fs.StringVar(&cfg.orgID, "org-id", "", "Axiom organization ID")
 	fs.Float64Var(&cfg.queryRateLimit, "query-rate", 1, "Queries per second limit")
 	fs.IntVar(&cfg.queryRateBurst, "query-burst", 1, "Query burst capacity")
 	fs.Float64Var(&cfg.datasetsRateLimit, "datasets-rate", 1, "Dataset list operations per second")
