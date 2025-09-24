@@ -1,5 +1,16 @@
-# mcp-server-axiom
 
+# [DEPRECATED] mcp-server-axiom
+
+---
+
+### ⚠️ DEPRECATION NOTICE 
+
+**This repository is deprecated and no longer maintained.**  
+Please use the official Axiom MCP Server at [https://mcp.axiom.co](https://mcp.axiom.co) instead.
+
+---
+
+## Overview
 A [Model Context Protocol](https://modelcontextprotocol.io/) server implementation for [Axiom](https://axiom.co) that enables AI agents to query your data using Axiom Processing Language (APL).
 
 ## Status
